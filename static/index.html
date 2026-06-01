@@ -1,138 +1,748 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portmap</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portmap</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c10;
+      --surface:   #0e1419;
+      --surface2:  #141b22;
+      --border:    #1e2a35;
+      --border2:   #253040;
+      --text:      #d4dde6;
+      --muted:     #4d6070;
+      --accent:    #00d4ff;
+      --accent2:   #0099bb;
+      --green:     #00e676;
+      --green-dim: #00c85310;
+      --red:       #ff4d4d;
+      --red-dim:   #ff4d4d12;
+      --yellow:    #ffc400;
+      --font-mono: 'IBM Plex Mono', monospace;
+      --font-ui:   'Inter', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.3;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 40px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-group { display: flex; flex-direction: column; gap: 6px; }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 28px; height: 28px;
+      border: 1.5px solid var(--accent);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+    }
+
+    .logo-icon svg { width: 14px; height: 14px; }
+
+    h1 {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+
+    .tagline {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
+
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      background: var(--green-dim);
+      border: 1px solid #00e67620;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--green);
+      letter-spacing: 0.04em;
+    }
+
+    .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      position: relative;
+    }
+
+    .dot::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      background: var(--green);
+      opacity: 0.3;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.3; }
+      50%       { transform: scale(1.8); opacity: 0; }
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .stat {
+      text-align: right;
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 3px;
+    }
+
+    .stat-divider {
+      width: 1px;
+      height: 28px;
+      background: var(--border2);
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .filter-btn {
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: var(--font-ui);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn:hover { border-color: var(--border2); color: var(--text); }
+
+    .filter-btn.active {
+      background: var(--surface2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .filter-spacer { flex: 1; }
+
+    .search-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 10px;
+      color: var(--muted);
+      width: 13px; height: 13px;
+      pointer-events: none;
+    }
+
+    #search {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 6px 12px 6px 30px;
+      width: 200px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    #search:focus { border-color: var(--accent2); }
+    #search::placeholder { color: var(--muted); }
+
+    /* ── Grid ── */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    /* ── Service Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: border-color 0.2s, transform 0.2s;
+      animation: cardIn 0.25s ease forwards;
+      cursor: default;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card:hover {
+      border-color: var(--border2);
+      transform: translateY(-1px);
+    }
+
+    .card.dying {
+      opacity: 0.4;
+      filter: grayscale(1);
+      pointer-events: none;
+      transition: opacity 0.4s, filter 0.4s;
+    }
+
+    /* Card top row */
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .service-id {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .service-icon {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      flex-shrink: 0;
+      border: 1px solid transparent;
+    }
+
+    .service-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    .service-proc {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+
+    .status-badge.up {
+      background: var(--green-dim);
+      border: 1px solid #00e67618;
+      color: var(--green);
+    }
+
+    .status-badge.protected {
+      background: #ffffff08;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Card meta row */
+    .card-meta {
+      display: flex;
+      gap: 20px;
+    }
+
+    .meta-item { display: flex; flex-direction: column; gap: 2px; }
+
+    .meta-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .meta-value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    .meta-value.muted { color: var(--muted); }
+
+    /* Card bottom row */
+    .card-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .open-link {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+      padding: 4px 0;
+    }
+
+    .open-link svg { width: 11px; height: 11px; }
+
+    .open-link:hover { color: var(--accent); }
+
+    .card-actions { display: flex; gap: 6px; }
+
+    .btn-kill {
+      padding: 5px 14px;
+      border-radius: 7px;
+      border: 1px solid #ff4d4d30;
+      background: var(--red-dim);
+      color: var(--red);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-kill:hover:not(:disabled) {
+      background: #ff4d4d22;
+      border-color: #ff4d4d60;
+    }
+
+    .btn-kill:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Empty state */
+    #empty {
+      display: none;
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 64px 0;
+      color: var(--muted);
+    }
+
+    #empty svg { width: 40px; height: 40px; margin-bottom: 12px; opacity: 0.3; }
+    #empty p { font-size: 13px; }
+
+    /* Protected card style */
+    .card.protected-card {
+      border-style: dashed;
+      opacity: 0.6;
+    }
+
+    .card.protected-card:hover { opacity: 0.7; transform: none; }
+
+    /* Separator between user/system */
+    .section-label {
+      grid-column: 1 / -1;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 10px 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text);
+      z-index: 100;
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.2s;
+      pointer-events: none;
+    }
+
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.error { border-color: #ff4d4d50; color: var(--red); }
+    #toast.success { border-color: #00e67640; color: var(--green); }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100">
-    <div class="container mx-auto p-4">
-        <header class="mb-8">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h1 class="text-3xl font-bold">Portmap Live Monitor</h1>
-                    <p class="text-slate-400">Real-time view of listening network connections on this machine.</p>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="relative flex h-3 w-3">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                    <span class="text-green-400">Live Streaming</span>
-                </div>
-            </div>
-        </header>
-        <table class="w-full text-left">
-            <thead class="border-b border-slate-700">
-                <tr>
-                    <th class="p-4 w-1/6 text-sm font-medium uppercase tracking-wider">Port</th>
-                    <th class="p-4 w-1/6 text-sm font-medium uppercase tracking-wider">PID</th>
-                    <th class="p-4 w-3/6 text-sm font-medium uppercase tracking-wider">Process Name</th>
-                    <th class="p-4 w-1/6 text-sm font-medium uppercase tracking-wider text-center">Action</th>
-                </tr>
-            </thead>
-            <tbody id="connections-table-body">
-                <!-- Mock Row 1: User Process -->
-                <tr class="border-b border-slate-800">
-                    <td class="p-4 font-mono text-cyan-400">8000</td>
-                    <td class="p-4">12345</td>
-                    <td class="p-4">
-                        <div class="flex items-center">
-                            <span class="px-2 py-1 text-xs font-semibold bg-blue-500 text-white rounded-full">python3</span>
-                        </div>
-                    </td>
-                    <td class="p-4 text-center">
-                        <button class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs">Kill</button>
-                    </td>
-                </tr>
-                <!-- Mock Row 2: System Process -->
-                <tr class="border-b border-slate-800">
-                    <td class="p-4 font-mono text-slate-500">53</td>
-                    <td class="p-4 text-slate-500">N/A</td>
-                    <td class="p-4">
-                        <div class="flex items-center">
-                            <span class="px-2 py-1 text-xs font-semibold bg-slate-700 text-slate-300 rounded-full">Protected</span>
-                        </div>
-                    </td>
-                    <td class="p-4 text-center">
-                        <span class="text-xs text-slate-500 italic">System Protected</span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+<body>
+
+<div class="layout">
+  <header>
+    <div class="logo-group">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="7" r="2.5" stroke="#00d4ff" stroke-width="1.2"/>
+            <path d="M7 1v2M7 11v2M1 7h2M11 7h2" stroke="#00d4ff" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>portmap</h1>
+      </div>
+      <span class="tagline">Local service monitor · Real-time</span>
     </div>
 
-    <script>
-        const ws = new WebSocket(`ws://${window.location.host}/ws/scan`);
+    <div class="header-right">
+      <div class="live-badge">
+        <span class="dot"></span>
+        LIVE
+      </div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-value" id="count-active">—</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <div class="stat-value" id="count-protected">—</div>
+          <div class="stat-label">Protected</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <div class="stat-value" id="count-total">—</div>
+          <div class="stat-label">Total</div>
+        </div>
+      </div>
+    </div>
+  </header>
 
-        ws.onmessage = function(event) {
-            const connections = JSON.parse(event.data);
-            const tableBody = document.getElementById('connections-table-body');
-            let tableContent = '';
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="user">User</button>
+    <button class="filter-btn" data-filter="system">System</button>
+    <div class="filter-spacer"></div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="6.5" cy="6.5" r="4.5"/><path d="M11 11l3 3" stroke-linecap="round"/>
+      </svg>
+      <input id="search" type="text" placeholder="filter ports, names..." />
+    </div>
+  </div>
 
-            connections.forEach(conn => {
-                if (conn.pid) {
-                    // Template for user processes
-                    tableContent += `
-                        <tr class="border-b border-slate-800">
-                            <td class="p-4 font-mono text-cyan-400">${conn.port}</td>
-                            <td class="p-4">${conn.pid}</td>
-                            <td class="p-4">
-                                <div class="flex items-center">
-                                    <span class="px-2 py-1 text-xs font-semibold bg-blue-500 text-white rounded-full">${conn.name}</span>
-                                </div>
-                            </td>
-                            <td class="p-4 text-center">
-                                <button id="kill-btn-${conn.pid}" onclick="killProcess(${conn.pid})" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-xs">Kill</button>
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    // Template for system/protected processes
-                    tableContent += `
-                        <tr class="border-b border-slate-800">
-                            <td class="p-4 font-mono text-slate-500">${conn.port}</td>
-                            <td class="p-4 text-slate-500">N/A</td>
-                            <td class="p-4">
-                                <div class="flex items-center">
-                                    <span class="px-2 py-1 text-xs font-semibold bg-slate-700 text-slate-300 rounded-full">Protected</span>
-                                </div>
-                            </td>
-                            <td class="p-4 text-center">
-                                <span class="text-xs text-slate-500 italic">System Protected</span>
-                            </td>
-                        </tr>
-                    `;
-                }
-            });
-            tableBody.innerHTML = tableContent;
-        };
+  <div id="grid">
+    <div id="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"/>
+      </svg>
+      <p>No services match your filter.</p>
+    </div>
+  </div>
+</div>
 
-        function killProcess(pid) {
-            const killButton = document.getElementById(`kill-btn-${pid}`);
-            if (killButton) {
-                killButton.innerHTML = 'Killing...';
-                killButton.disabled = true;
-            }
+<div id="toast"></div>
 
-            fetch(`/api/kill/${pid}`, {
-                method: 'POST',
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log(data.message);
-                // The WebSocket will update the table automatically, so no need to re-enable the button here.
-            })
-            .catch((error) => {
-                console.error('Error:', error);
-                if (killButton) {
-                    // Restore button on error
-                    killButton.innerHTML = 'Kill';
-                    killButton.disabled = false;
-                }
-            });
-        }
-    </script>
+<script>
+  // ── Service metadata (icons + colors) ──
+  const SERVICE_META = {
+    'FastAPI':     { emoji: '⚡', bg: '#00b09610', border: '#00b09630', accent: '#00b096' },
+    'Django':      { emoji: '🟢', bg: '#0c4b3310', border: '#0c4b3340', accent: '#44b78b' },
+    'Node.js':     { emoji: '🟡', bg: '#41692110', border: '#41692130', accent: '#8bc34a' },
+    'Redis':       { emoji: '🔴', bg: '#dc143c10', border: '#dc143c30', accent: '#dc143c' },
+    'PostgreSQL':  { emoji: '🐘', bg: '#33669910', border: '#33669930', accent: '#336699' },
+    'Docker':      { emoji: '🐳', bg: '#0db7ed10', border: '#0db7ed30', accent: '#0db7ed' },
+    'VS Code Service': { emoji: '💜', bg: '#5c2d9110', border: '#5c2d9130', accent: '#9b59b6' },
+    'Unknown':     { emoji: '⚙️', bg: '#ffffff08', border: '#ffffff15', accent: '#6c8090' },
+  };
+
+  function getMeta(name) {
+    return SERVICE_META[name] || { emoji: '⚙️', bg: '#ffffff08', border: '#ffffff15', accent: '#6c8090' };
+  }
+
+  // ── State ──
+  let allConnections = [];
+  let activeFilter = 'all';
+  let searchQuery = '';
+
+  // ── WebSocket ──
+  let ws;
+  function connect() {
+    ws = new WebSocket(`ws://${window.location.host}/ws/scan`);
+    ws.onmessage = (e) => {
+      allConnections = JSON.parse(e.data);
+      render();
+    };
+    ws.onclose = () => setTimeout(connect, 2000); // auto-reconnect
+  }
+  connect();
+
+  // ── Filters ──
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      render();
+    });
+  });
+
+  document.getElementById('search').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase();
+    render();
+  });
+
+  // ── Render ──
+  function render() {
+    const grid = document.getElementById('grid');
+
+    let filtered = allConnections.filter(conn => {
+      if (activeFilter === 'user'   && !conn.pid) return false;
+      if (activeFilter === 'system' &&  conn.pid) return false;
+      if (searchQuery) {
+        const q = searchQuery;
+        return String(conn.port).includes(q) ||
+               conn.name.toLowerCase().includes(q);
+      }
+      return true;
+    });
+
+    // Stats
+    const userCount = allConnections.filter(c => c.pid).length;
+    const sysCount  = allConnections.filter(c => !c.pid).length;
+    document.getElementById('count-active').textContent    = userCount;
+    document.getElementById('count-protected').textContent = sysCount;
+    document.getElementById('count-total').textContent     = allConnections.length;
+
+    // Empty state
+    const empty = document.getElementById('empty');
+    empty.style.display = filtered.length === 0 ? 'block' : 'none';
+
+    // Build cards — user first, then system
+    const userConns = filtered.filter(c => c.pid);
+    const sysConns  = filtered.filter(c => !c.pid);
+
+    let html = '';
+
+    if (userConns.length > 0) {
+      html += `<div class="section-label">User services · ${userConns.length}</div>`;
+      userConns.forEach(conn => { html += buildUserCard(conn); });
+    }
+
+    if (sysConns.length > 0) {
+      html += `<div class="section-label">System · ${sysConns.length}</div>`;
+      sysConns.forEach(conn => { html += buildSystemCard(conn); });
+    }
+
+    // Replace only non-empty content (preserve empty state div)
+    const cards = grid.querySelectorAll('.card, .section-label');
+    cards.forEach(el => el.remove());
+    grid.insertAdjacentHTML('beforeend', html);
+  }
+
+  function buildUserCard(conn) {
+    const meta = getMeta(conn.name);
+    const localUrl = `http://localhost:${conn.port}`;
+    return `
+      <div class="card" id="card-${conn.pid}" data-pid="${conn.pid}" data-port="${conn.port}">
+        <div class="card-top">
+          <div class="service-id">
+            <div class="service-icon" style="background:${meta.bg};border-color:${meta.border}">
+              ${meta.emoji}
+            </div>
+            <div>
+              <div class="service-name">${conn.name}</div>
+              <div class="service-proc">pid ${conn.pid}</div>
+            </div>
+          </div>
+          <div class="status-badge up">
+            <span class="status-dot"></span>
+            UP
+          </div>
+        </div>
+
+        <div class="card-meta">
+          <div class="meta-item">
+            <span class="meta-label">Port</span>
+            <span class="meta-value">:${conn.port}</span>
+          </div>
+        </div>
+
+        <div class="card-bottom">
+          <a class="open-link" href="${localUrl}" target="_blank" rel="noopener">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 10L10 2M5 2h5v5"/>
+            </svg>
+            localhost:${conn.port}
+          </a>
+          <div class="card-actions">
+            <button class="btn-kill" id="kill-${conn.pid}" onclick="killProcess(${conn.pid}, ${conn.port})">
+              Kill
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function buildSystemCard(conn) {
+    return `
+      <div class="card protected-card" id="card-sys-${conn.port}">
+        <div class="card-top">
+          <div class="service-id">
+            <div class="service-icon" style="background:#ffffff06;border-color:#ffffff10">🔒</div>
+            <div>
+              <div class="service-name" style="color:#4d6070">System Process</div>
+              <div class="service-proc">pid protected</div>
+            </div>
+          </div>
+          <div class="status-badge protected">
+            <span class="status-dot"></span>
+            SYS
+          </div>
+        </div>
+        <div class="card-meta">
+          <div class="meta-item">
+            <span class="meta-label">Port</span>
+            <span class="meta-value muted">:${conn.port}</span>
+          </div>
+        </div>
+        <div class="card-bottom">
+          <span class="open-link" style="cursor:default">
+            System protected
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Kill ──
+  async function killProcess(pid, port) {
+    const btn  = document.getElementById(`kill-${pid}`);
+    const card = document.getElementById(`card-${pid}`);
+
+    if (btn)  { btn.textContent = 'Killing…'; btn.disabled = true; }
+    if (card) { card.classList.add('dying'); }
+
+    try {
+      const res  = await fetch(`/api/kill/${pid}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Port :${port} process terminated`, 'success');
+      } else {
+        showToast(data.detail || 'Kill failed', 'error');
+        if (btn)  { btn.textContent = 'Kill'; btn.disabled = false; }
+        if (card) { card.classList.remove('dying'); }
+      }
+    } catch {
+      showToast('Network error', 'error');
+      if (btn)  { btn.textContent = 'Kill'; btn.disabled = false; }
+      if (card) { card.classList.remove('dying'); }
+    }
+  }
+
+  // ── Toast ──
+  let toastTimer;
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+  }
+</script>
 </body>
 </html>
