@@ -1,59 +1,125 @@
 import psutil
-KNOWN_SIGNATURES = {
-    "uvicorn": {"name": "FastAPI", "color": "bg-teal-500"},
-    "django": {"name": "Django", "color": "bg-green-600"},
-    ".vscode": {"name": "VS Code Service", "color": "bg-purple-600"},
-    "docker-proxy": {"name": "Docker", "color": "bg-blue-600"},
-    "node": {"name": "Node.js", "color": "bg-yellow-500"},
-    "redis-server": {"name": "Redis", "color": "bg-red-500"},
-    "postgres": {"name": "PostgreSQL", "color": "bg-blue-500"}
+from pathlib import Path
+
+FRAMEWORK_MARKERS = {
+    "manage.py":        "Django",
+    "pyproject.toml":   "Python",
+    "requirements.txt": "Python",
+    "package.json":     "Node.js",
+    "go.mod":           "Go",
+    "Cargo.toml":       "Rust",
+    "Gemfile":          "Ruby",
+    "pom.xml":          "Java",
+    "composer.json":    "PHP",
 }
-def get_listening_connections():
-    connections_list = []
+
+INFRASTRUCTURE = {
+    "redis-server": "Redis",
+    "postgres":     "PostgreSQL",
+    "mysqld":       "MySQL",
+    "mongod":       "MongoDB",
+    "nginx":        "Nginx",
+    "docker-proxy": "Docker",
+}
+
+SKIP_PROCESSES = {
+    "code", "code-oss", "codium", "cursor",
+    "webstorm", "idea", "pycharm", "clion", "rider",
+    "postman", "insomnia",
+}
+
+SKIP_FLAGS = {
+    "--type=renderer", "--type=gpu-process",
+    "--type=utility",  "--type=broker",
+    "node.mojom.nodeservice",
+}
+
+
+def _should_skip(pid: int) -> bool:
+    try:
+        proc = psutil.Process(pid)
+        name = proc.name().lower().removesuffix(".exe")
+        if name in SKIP_PROCESSES:
+            return True
+        cmdline = " ".join(proc.cmdline())
+        return any(flag in cmdline for flag in SKIP_FLAGS)
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        return True
+
+
+def _find_git_root(pid: int) -> Path | None:
+    try:
+        path = Path(psutil.Process(pid).cwd())
+    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+        return None
+
+    for _ in range(6):
+        if (path / ".git").exists():
+            return path
+        parent = path.parent
+        if parent == path:
+            break
+        path = parent
+    return None
+
+
+def _identify_framework(git_root: Path) -> str:
+    try:
+        entries = {e.name for e in git_root.iterdir()}
+    except OSError:
+        return "Project"
+    for marker, framework in FRAMEWORK_MARKERS.items():
+        if marker in entries:
+            return framework
+    return "Project"
+
+
+def get_listening_connections() -> list[dict]:
+    results = []
+    seen = set()
 
     for conn in psutil.net_connections(kind='inet'):
-        if conn.status == 'LISTEN':
-            port = conn.laddr.port
-            pid = conn.pid
+        if conn.status != 'LISTEN':
+            continue
 
-            app_name = "Unknown"
-            badge_color = "bg-slate-500"
+        port, pid = conn.laddr.port, conn.pid
+        if (port, pid) in seen:
+            continue
+        seen.add((port, pid))
 
-            if pid is not None:
-                try:
-                    process = psutil.Process(pid)
-                    raw_name = process.name()
-                    try:
-                        cmdline = " ".join(process.cmdline()).lower()
-                    except (psutil.AccessDenied, psutil.ZombieProcess):
-                        cmdline = ""
+        # No PID → kernel/system
+        if pid is None:
+            results.append({"port": port, "pid": None,
+                            "name": "System", "framework": None,
+                            "cwd": None, "kind": "system"})
+            continue
 
-                    found = False
-                    for key, meta in KNOWN_SIGNATURES.items():
-                        if key in cmdline or key in raw_name.lower():
-                            app_name = meta["name"]
-                            badge_color = meta["color"]
-                            found = True
-                            break
+        # Skip IDE workers and Chromium internal processes
+        if _should_skip(pid):
+            continue
 
-                    if not found:
-                        app_name = raw_name
-                        badge_color = "bg-blue-500"
+        # Git root → confirmed project
+        git_root = _find_git_root(pid)
+        if git_root:
+            framework = _identify_framework(git_root)
+            results.append({"port": port, "pid": pid,
+                            "name": framework, "framework": framework,
+                            "cwd": str(git_root), "kind": "project"})
+            continue
 
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    app_name = "Protected"
-                    badge_color = "bg-slate-700"
-            else:
-                app_name = "Protected"
-                badge_color = "bg-slate-700"
+        # Known infrastructure daemon
+        raw_name = psutil.Process(pid).name() if pid else "unknown"
+        if raw_name.lower() in INFRASTRUCTURE:
+            label = INFRASTRUCTURE[raw_name.lower()]
+            results.append({"port": port, "pid": pid,
+                            "name": label, "framework": label,
+                            "cwd": None, "kind": "infrastructure"})
+            continue
 
-            connection_info = {
-                "port": port,
-                "pid": pid,
-                "name": app_name,
-                "color": badge_color
-            }
-            connections_list.append(connection_info)
+        # Honest fallback
+        results.append({"port": port, "pid": pid,
+                        "name": raw_name, "framework": None,
+                        "cwd": None, "kind": "unknown"})
 
-    connections_list.sort(key=lambda x: x["port"])
-    return connections_list
+    results.sort(key=lambda x: x["port"])
+    return results

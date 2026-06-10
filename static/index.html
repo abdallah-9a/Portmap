@@ -464,6 +464,12 @@
       transition: all 0.2s;
       pointer-events: none;
     }
+    
+    .status-badge.unknown {
+      background: #ffffff06;
+      border: 1px solid var(--border2);
+      color: var(--muted);
+    }
 
     #toast.show { transform: translateY(0); opacity: 1; }
     #toast.error { border-color: #ff4d4d50; color: var(--red); }
@@ -538,19 +544,29 @@
 
 <script>
   // ── Service metadata (icons + colors) ──
-  const SERVICE_META = {
-    'FastAPI':     { emoji: '⚡', bg: '#00b09610', border: '#00b09630', accent: '#00b096' },
-    'Django':      { emoji: '🟢', bg: '#0c4b3310', border: '#0c4b3340', accent: '#44b78b' },
-    'Node.js':     { emoji: '🟡', bg: '#41692110', border: '#41692130', accent: '#8bc34a' },
-    'Redis':       { emoji: '🔴', bg: '#dc143c10', border: '#dc143c30', accent: '#dc143c' },
-    'PostgreSQL':  { emoji: '🐘', bg: '#33669910', border: '#33669930', accent: '#336699' },
-    'Docker':      { emoji: '🐳', bg: '#0db7ed10', border: '#0db7ed30', accent: '#0db7ed' },
-    'VS Code Service': { emoji: '💜', bg: '#5c2d9110', border: '#5c2d9130', accent: '#9b59b6' },
-    'Unknown':     { emoji: '⚙️', bg: '#ffffff08', border: '#ffffff15', accent: '#6c8090' },
+  const FRAMEWORK_META = {
+    'Django':       { emoji: '🟢', bg: '#0c4b3310', border: '#0c4b3340', accent: '#44b78b' },
+    'Python':       { emoji: '🐍', bg: '#3572a510', border: '#3572a530', accent: '#3572a5' },
+    'FastAPI':      { emoji: '⚡', bg: '#00b09610', border: '#00b09630', accent: '#00b096' },
+    'Node.js':      { emoji: '📦', bg: '#41692110', border: '#41692130', accent: '#8bc34a' },
+    'Go':           { emoji: '🐹', bg: '#00add810', border: '#00add830', accent: '#00add8' },
+    'Rust':         { emoji: '🦀', bg: '#de3a1710', border: '#de3a1730', accent: '#de3a17' },
+    'Ruby':         { emoji: '💎', bg: '#cc342d10', border: '#cc342d30', accent: '#cc342d' },
+    'Java':         { emoji: '☕', bg: '#b0721310', border: '#b0721330', accent: '#b07213' },
+    'Redis':        { emoji: '🔴', bg: '#dc143c10', border: '#dc143c30', accent: '#dc143c' },
+    'PostgreSQL':   { emoji: '🐘', bg: '#33669910', border: '#33669930', accent: '#336699' },
+    'MySQL':        { emoji: '🐬', bg: '#0076a310', border: '#0076a330', accent: '#0076a3' },
+    'MongoDB':      { emoji: '🍃', bg: '#00ed6410', border: '#00ed6430', accent: '#00ed64' },
+    'Nginx':        { emoji: '🌐', bg: '#26962510', border: '#26962530', accent: '#269625' },
+    'Docker':       { emoji: '🐳', bg: '#0db7ed10', border: '#0db7ed30', accent: '#0db7ed' },
+    'PHP':          { emoji: '🐘', bg: '#77719910', border: '#77719930', accent: '#777199' },
   };
 
-  function getMeta(name) {
-    return SERVICE_META[name] || { emoji: '⚙️', bg: '#ffffff08', border: '#ffffff15', accent: '#6c8090' };
+  const UNKNOWN_META = { emoji: '●', bg: '#ffffff06', border: '#ffffff12', accent: '#4d6070' };
+
+  function getMeta(framework) {
+    if (!framework) return UNKNOWN_META;
+    return FRAMEWORK_META[framework] || UNKNOWN_META;
   }
 
   // ── State ──
@@ -566,7 +582,7 @@
       allConnections = JSON.parse(e.data);
       render();
     };
-    ws.onclose = () => setTimeout(connect, 2000); // auto-reconnect
+    ws.onclose = () => setTimeout(connect, 2000);
   }
   connect();
 
@@ -586,12 +602,13 @@
   });
 
   // ── Render ──
+  // ── Render ──
   function render() {
     const grid = document.getElementById('grid');
 
     let filtered = allConnections.filter(conn => {
-      if (activeFilter === 'user'   && !conn.pid) return false;
-      if (activeFilter === 'system' &&  conn.pid) return false;
+      if (activeFilter === 'user'   && conn.kind === 'system') return false;
+      if (activeFilter === 'system' && conn.kind !== 'system') return false;
       if (searchQuery) {
         const q = searchQuery;
         return String(conn.port).includes(q) ||
@@ -601,9 +618,10 @@
     });
 
     // Stats
-    const userCount = allConnections.filter(c => c.pid).length;
-    const sysCount  = allConnections.filter(c => !c.pid).length;
-    document.getElementById('count-active').textContent    = userCount;
+    const projectCount  = allConnections.filter(c => c.kind === 'project' || c.kind === 'infrastructure').length;
+    const sysCount      = allConnections.filter(c => c.kind === 'system').length;
+
+    document.getElementById('count-active').textContent    = projectCount;
     document.getElementById('count-protected').textContent = sysCount;
     document.getElementById('count-total').textContent     = allConnections.length;
 
@@ -611,14 +629,14 @@
     const empty = document.getElementById('empty');
     empty.style.display = filtered.length === 0 ? 'block' : 'none';
 
-    // Build cards — user first, then system
-    const userConns = filtered.filter(c => c.pid);
-    const sysConns  = filtered.filter(c => !c.pid);
+    // 2 Sections Layout: User Services (Projects + Unconfirmed) & System
+    const userConns = filtered.filter(c => c.kind !== 'system');
+    const sysConns  = filtered.filter(c => c.kind === 'system');
 
     let html = '';
 
     if (userConns.length > 0) {
-      html += `<div class="section-label">User services · ${userConns.length}</div>`;
+      html += `<div class="section-label">User Services · ${userConns.length}</div>`;
       userConns.forEach(conn => { html += buildUserCard(conn); });
     }
 
@@ -627,30 +645,47 @@
       sysConns.forEach(conn => { html += buildSystemCard(conn); });
     }
 
-    // Replace only non-empty content (preserve empty state div)
     const cards = grid.querySelectorAll('.card, .section-label');
     cards.forEach(el => el.remove());
     grid.insertAdjacentHTML('beforeend', html);
   }
 
   function buildUserCard(conn) {
-    const meta = getMeta(conn.name);
-    const localUrl = `http://localhost:${conn.port}`;
+    const meta      = getMeta(conn.framework);
+    const localUrl  = `http://localhost:${conn.port}`;
+    const isProject = conn.kind === 'project';
+
+    const displayName = conn.framework || conn.name;
+
+    const subtitle = isProject && conn.cwd
+      ? conn.cwd.split('/').pop()
+      : `pid ${conn.pid}`;
+
+    const cardBorder = conn.framework
+      ? `border-color: ${meta.border}`
+      : 'border-color: var(--border)';
+
     return `
-      <div class="card" id="card-${conn.pid}" data-pid="${conn.pid}" data-port="${conn.port}">
+      <div class="card" id="card-${conn.pid}"
+           data-pid="${conn.pid}"
+           data-port="${conn.port}"
+           style="${cardBorder}">
+
         <div class="card-top">
           <div class="service-id">
-            <div class="service-icon" style="background:${meta.bg};border-color:${meta.border}">
+            <div class="service-icon"
+                 style="background:${meta.bg}; border-color:${meta.border}; font-size:15px">
               ${meta.emoji}
             </div>
             <div>
-              <div class="service-name">${conn.name}</div>
-              <div class="service-proc">pid ${conn.pid}</div>
+              <div class="service-name">${displayName}</div>
+              <div class="service-proc">${subtitle}</div>
             </div>
           </div>
-          <div class="status-badge up">
+
+          <div class="status-badge ${conn.framework ? 'up' : 'unknown'}">
             <span class="status-dot"></span>
-            UP
+            ${conn.framework ? conn.kind.toUpperCase() : 'UNCONFIRMED'}
           </div>
         </div>
 
@@ -659,23 +694,31 @@
             <span class="meta-label">Port</span>
             <span class="meta-value">:${conn.port}</span>
           </div>
+          ${conn.cwd ? `
+          <div class="meta-item">
+            <span class="meta-label">Project</span>
+            <span class="meta-value" style="color:var(--muted);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                  title="${conn.cwd}">${conn.cwd}</span>
+          </div>` : ''}
         </div>
 
         <div class="card-bottom">
           <a class="open-link" href="${localUrl}" target="_blank" rel="noopener">
-            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                 stroke-width="1.5" stroke-linecap="round">
               <path d="M2 10L10 2M5 2h5v5"/>
             </svg>
             localhost:${conn.port}
           </a>
           <div class="card-actions">
-            <button class="btn-kill" id="kill-${conn.pid}" onclick="killProcess(${conn.pid}, ${conn.port})">
+            <button class="btn-kill"
+                    id="kill-${conn.pid}"
+                    onclick="killProcess(${conn.pid}, ${conn.port})">
               Kill
             </button>
           </div>
-        </div>
-      </div>
-    `;
+        </div> 
+      </div>`;
   }
 
   function buildSystemCard(conn) {
