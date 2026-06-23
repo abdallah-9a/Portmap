@@ -3,8 +3,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from scraper import get_listening_connections
 import asyncio
-import os
-import signal
+import psutil
+
+# UIDs below this are reserved for privileged/system accounts on Linux
+# (root is 0; the 1..999 range is daemons and service users). Ownership —
+# not the PID value — is what determines whether a process is safe to kill.
+SYSTEM_UID_MAX = 1000
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -74,14 +78,27 @@ async def websocket_endpoint(ws: WebSocket):
 
 @app.post("/api/kill/{pid}")
 async def kill_process(pid: int):
-    if pid <= 1000:
-        raise HTTPException(status_code=403, detail="Cannot kill system processes.")
     try:
-        os.kill(pid, signal.SIGKILL)
-        return {"message": f"Process {pid} killed successfully."}
-    except ProcessLookupError:
+        proc = psutil.Process(pid)
+        owner_uid = proc.uids().real
+    except psutil.NoSuchProcess:
         raise HTTPException(status_code=404, detail=f"PID {pid} not found.")
-    except PermissionError:
+    except psutil.AccessDenied:
+        raise HTTPException(status_code=403, detail=f"Permission denied for PID {pid}.")
+
+    # Protect processes owned by privileged/system accounts, regardless of PID.
+    if owner_uid < SYSTEM_UID_MAX:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot kill process {pid}: owned by a protected system account.",
+        )
+
+    try:
+        proc.kill()
+        return {"message": f"Process {pid} killed successfully."}
+    except psutil.NoSuchProcess:
+        raise HTTPException(status_code=404, detail=f"PID {pid} not found.")
+    except psutil.AccessDenied:
         raise HTTPException(status_code=403, detail=f"Permission denied for PID {pid}.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
