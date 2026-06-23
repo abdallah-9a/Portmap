@@ -655,10 +655,10 @@
     const localUrl  = `http://localhost:${conn.port}`;
     const isProject = conn.kind === 'project';
 
-    const displayName = conn.framework || conn.name;
+    const displayName = conn.name || conn.framework;
 
-    const subtitle = isProject && conn.cwd
-      ? conn.cwd.split('/').pop()
+    const subtitle = isProject
+      ? (conn.framework || `pid ${conn.pid}`)
       : `pid ${conn.pid}`;
 
     const cardBorder = conn.framework
