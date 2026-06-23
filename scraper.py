@@ -63,6 +63,11 @@ def _find_git_root(pid: int) -> Path | None:
     return None
 
 
+def _project_name(git_root: Path) -> str:
+    # The git root directory name is the project name 
+    return git_root.name or str(git_root)
+
+
 def _identify_framework(git_root: Path) -> str:
     try:
         entries = {e.name for e in git_root.iterdir()}
@@ -102,8 +107,9 @@ def get_listening_connections() -> list[dict]:
         git_root = _find_git_root(pid)
         if git_root:
             framework = _identify_framework(git_root)
+            project = _project_name(git_root)
             results.append({"port": port, "pid": pid,
-                            "name": framework, "framework": framework,
+                            "name": project, "framework": framework,
                             "cwd": str(git_root), "kind": "project"})
             continue
 
