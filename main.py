@@ -94,10 +94,25 @@ async def kill_process(pid: int):
         )
 
     try:
-        proc.kill()
-        return {"message": f"Process {pid} killed successfully."}
+        proc.terminate()
+        try:
+            await asyncio.to_thread(proc.wait, timeout=5)
+            return {
+                "message": f"Process {pid} terminated gracefully.",
+                "method": "SIGTERM"
+            }
+        except psutil.TimeoutExpired:
+            proc.kill()
+            await asyncio.to_thread(proc.wait, timeout=2)
+            return {
+                "message": f"Process {pid} force killed after graceful termination timeout.",
+                "method": "SIGKILL"
+            }
     except psutil.NoSuchProcess:
-        raise HTTPException(status_code=404, detail=f"PID {pid} not found.")
+        return {
+            "message": f"Process {pid} terminated.",
+            "method": "SIGTERM"
+        }
     except psutil.AccessDenied:
         raise HTTPException(status_code=403, detail=f"Permission denied for PID {pid}.")
     except Exception as e:

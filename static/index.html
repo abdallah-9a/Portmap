@@ -764,7 +764,9 @@
       const res  = await fetch(`/api/kill/${pid}`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Port :${port} process terminated`, 'success');
+        // Display method used for termination
+        const method = data.method === 'SIGKILL' ? ' (force killed)' : '';
+        showToast(`Port :${port} process terminated${method}`, 'success');
       } else {
         showToast(data.detail || 'Kill failed', 'error');
         if (btn)  { btn.textContent = 'Kill'; btn.disabled = false; }
