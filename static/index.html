@@ -543,6 +543,12 @@
 <div id="toast"></div>
 
 <script>
+  // Escape text for safe embedding in HTML attributes
+  function escapeAttr(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+                    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   // ── Service metadata (icons + colors) ──
   const FRAMEWORK_META = {
     'Django':       { emoji: '🟢', bg: '#0c4b3310', border: '#0c4b3340', accent: '#44b78b' },
@@ -713,6 +719,7 @@
           <div class="card-actions">
             <button class="btn-kill"
                     id="kill-${conn.pid}"
+                    data-name="${escapeAttr(displayName)}"
                     onclick="killProcess(${conn.pid}, ${conn.port})">
               Kill
             </button>
@@ -756,6 +763,12 @@
   async function killProcess(pid, port) {
     const btn  = document.getElementById(`kill-${pid}`);
     const card = document.getElementById(`card-${pid}`);
+
+    // Require explicit confirmation before sending any kill request.
+    const name = (btn && btn.dataset.name) || 'this process';
+    if (!confirm(`Kill ${name} (PID ${pid})?`)) {
+      return;  // Cancelled — no request is sent.
+    }
 
     if (btn)  { btn.textContent = 'Killing…'; btn.disabled = true; }
     if (card) { card.classList.add('dying'); }
