@@ -48,7 +48,10 @@ async def scan_loop():
     global _previous_snapshot
     while True:
         try:
-            current = get_listening_connections()
+            # psutil scanning is blocking (net_connections + per-PID /proc and
+            # filesystem reads). Run it in a worker thread so the event loop
+            # stays responsive for websocket broadcasts and the kill endpoint.
+            current = await asyncio.to_thread(get_listening_connections)
 
             if current != _previous_snapshot:
                 await manager.broadcast(current)
