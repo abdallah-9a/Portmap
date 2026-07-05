@@ -1,7 +1,9 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from scraper import get_listening_connections
+from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 import asyncio
 import psutil
 
@@ -10,7 +12,68 @@ import psutil
 # not the PID value — is what determines whether a process is safe to kill.
 SYSTEM_UID_MAX = 1000
 
-app = FastAPI()
+# Hostnames that count as "the local machine". A request's Origin is only
+# trusted when it points at one of these on the same port the request was
+# sent to — see is_allowed_origin().
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
+
+
+def is_allowed_origin(origin: str | None, host: str | None) -> bool:
+    """Decide whether a browser Origin may talk to Portmap.
+
+    Portmap binds to localhost, but that does not stop another site open in
+    the same browser from calling our endpoints — the browser sends those
+    requests from the user's machine. The defense is the Origin header, which
+    the browser sets to the calling page's origin and which a page cannot
+    forge.
+
+    Policy:
+      * No Origin header  → allow. Browsers always attach Origin to the
+        cross-site WebSocket and POST requests we care about, so a missing
+        Origin means a non-browser client (curl, tests), not the threat model.
+      * Origin present     → its host must be loopback AND its port must match
+        the port this request was sent to (the Host header). This transparently
+        accepts whatever address the user opened the UI on (127.0.0.1 or
+        localhost, any port) while rejecting every external site.
+    """
+    if origin is None:
+        return True
+
+    parsed = urlparse(origin)
+    if parsed.hostname is None or parsed.hostname.lower() not in LOOPBACK_HOSTS:
+        return False
+
+    # The Origin's port must match the port the request was actually sent to,
+    # so a page served from a *different* local port cannot reach us either.
+    host_port = None
+    if host:
+        host_port = host.rsplit(":", 1)[-1] if ":" in host else None
+
+    return _port_of(parsed) == host_port
+
+
+def _port_of(parsed) -> str | None:
+    if parsed.port is not None:
+        return str(parsed.port)
+    # No explicit port → the scheme's default (http → 80, https → 443).
+    return {"http": "80", "https": "443"}.get(parsed.scheme)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start the background scanner and keep a handle so we can stop it cleanly.
+    scanner = asyncio.create_task(scan_loop())
+    try:
+        yield
+    finally:
+        scanner.cancel()
+        try:
+            await scanner
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -40,10 +103,6 @@ manager = ConnectionManager()
 _previous_snapshot: list = []
 
 
-@app.on_event("startup")
-async def start_scanner():
-    asyncio.create_task(scan_loop())
-
 async def scan_loop():
     global _previous_snapshot
     while True:
@@ -67,6 +126,13 @@ async def read_index():
 
 @app.websocket("/ws/scan")
 async def websocket_endpoint(ws: WebSocket):
+    # Reject cross-site sockets before the handshake completes. A page from
+    # another origin can open a WebSocket to us, so the Origin must be checked
+    # here just as it is on the kill endpoint.
+    if not is_allowed_origin(ws.headers.get("origin"), ws.headers.get("host")):
+        await ws.close(code=1008)  # 1008 = policy violation
+        return
+
     await manager.connect(ws)
 
     if _previous_snapshot:
@@ -80,7 +146,14 @@ async def websocket_endpoint(ws: WebSocket):
         manager.disconnect(ws)
 
 @app.post("/api/kill/{pid}")
-async def kill_process(pid: int):
+async def kill_process(pid: int, request: Request):
+    # Block cross-site kill requests. Any page in the user's browser can POST
+    # here; only requests originating from the Portmap UI itself are allowed.
+    if not is_allowed_origin(
+        request.headers.get("origin"), request.headers.get("host")
+    ):
+        raise HTTPException(status_code=403, detail="Origin not allowed.")
+
     try:
         proc = psutil.Process(pid)
         owner_uid = proc.uids().real
