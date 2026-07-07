@@ -1,11 +1,17 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from scraper import get_listening_connections
+from .scraper import get_listening_connections
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
+from pathlib import Path
 import asyncio
 import psutil
+
+# Static assets ship inside the package, so resolve them relative to this file
+# rather than the process's working directory — that way the app runs the same
+# no matter which directory it is launched from.
+STATIC_DIR = Path(__file__).parent / "static"
 
 # UIDs below this are reserved for privileged/system accounts on Linux
 # (root is 0; the 1..999 range is daemons and service users). Ownership —
@@ -74,7 +80,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 class ConnectionManager:
@@ -122,7 +128,7 @@ async def scan_loop():
 
 @app.get("/")
 async def read_index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 @app.websocket("/ws/scan")
 async def websocket_endpoint(ws: WebSocket):

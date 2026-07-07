@@ -48,17 +48,14 @@ are juggling many services and want to watch and manage them continuously.
 
 ## Quick Start
 
-Linux with Python 3.12+:
+Linux with Python 3.11+:
 
 ```bash
-git clone https://github.com/abdallah-9a/Portmap.git
-cd Portmap
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-fastapi run main.py
+pip install portmap-dev
+portmap
 ```
 
-Then open <http://127.0.0.1:8000>. See [Installation](#installation) and
+Then open <http://127.0.0.1:7474>. See [Installation](#installation) and
 [Usage](#usage) for details.
 
 ---
@@ -87,37 +84,60 @@ Then open <http://127.0.0.1:8000>. See [Installation](#installation) and
 
 ## Installation
 
-**Requirements:** Linux, Python 3.12+.
+**Requirements:** Linux, Python 3.11+.
+
+Install from PyPI:
 
 ```bash
-# 1. Clone
+pip install portmap-dev
+```
+
+This installs the `portmap` command. To keep it isolated from your other
+tools, [`pipx`](https://pipx.pypa.io) is recommended:
+
+```bash
+pipx install portmap-dev
+```
+
+### From source
+
+```bash
 git clone https://github.com/abdallah-9a/Portmap.git
 cd Portmap
-
-# 2. Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e .
 ```
 
 ---
 
 ## Usage
 
-Start the server:
+Start the dashboard:
 
 ```bash
-fastapi run main.py
-# or, equivalently:
-# uvicorn main:app
+portmap
 ```
 
-Then open the UI in your browser:
+By default it binds to `127.0.0.1:7474` — a deliberately uncommon port, so it
+does not collide with whatever dev server you are trying to inspect. Override
+the host or port with flags:
+
+```bash
+portmap --port 9000        # run on a different port
+portmap --host 0.0.0.0     # bind to all interfaces (see the security note below)
+portmap --version          # print the installed version
+```
+
+You can also run it as a module:
+
+```bash
+python -m portmap
+```
+
+Then open the UI in your browser (default):
 
 ```
-http://127.0.0.1:8000
+http://127.0.0.1:7474
 ```
 
 Use the search box to filter by port or name, and click **Kill** next to a
@@ -161,8 +181,9 @@ _A short capture of the live updates and one-click kill in action._
 ## Contributing
 
 Issues and pull requests are welcome. For anything beyond a small fix, please
-open an issue first to discuss the approach. For local development, run
-`fastapi dev main.py` to get auto-reload.
+open an issue first to discuss the approach. For local development, install in
+editable mode (`pip install -e .`) and run `fastapi dev src/portmap/main.py` to
+get auto-reload.
 
 ---
 

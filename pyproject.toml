@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "portmap-dev"
+version = "1.1.0"
+description = "Real-time dashboard for monitoring and managing local listening ports"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["developer-tools", "ports", "monitoring", "networking", "dashboard"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Networking :: Monitoring",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Environment :: Console",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "psutil>=5.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/abdallah-9a/Portmap"
+Repository = "https://github.com/abdallah-9a/Portmap"
+Issues = "https://github.com/abdallah-9a/Portmap/issues"
+
+[project.scripts]
+portmap = "portmap.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/portmap"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/portmap/**",
+    "README.md",
+    "LICENSE",
+]
